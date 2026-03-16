@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Polar Run</title>
+
+<style>
+
+body{
+margin:0;
+background:linear-gradient(#bfe9ff,#8ecae6);
+font-family:Arial;
+text-align:center;
+overflow:hidden;
+}
+
+#ui{
+position:absolute;
+top:10px;
+width:100%;
+display:flex;
+flex-direction:column;
+align-items:center;
+}
+
+#message{
+font-size:22px;
+font-weight:bold;
+color:#023047;
+margin-bottom:5px;
+}
+
+#score{
+font-size:20px;
+}
+
+#hearts{
+font-size:24px;
+margin-top:4px;
+}
+
+canvas{
+display:block;
+margin:auto;
+margin-top:100px;
+background:linear-gradient(#dff6ff,#c8ecff);
+border-bottom:6px solid #023047;
+border-radius:10px;
+}
+
+/* GAME OVER */
+
+#gameOverScreen{
+display:none;
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+flex-direction:column;
+color:white;
+}
+
+#gameOverBox{
+background:#023047;
+padding:40px;
+border-radius:15px;
+box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+
+#gameOverTitle{
+font-size:30px;
+color:#ff595e;
+margin-bottom:20px;
+}
+
+#restartBtn{
+padding:14px 35px;
+font-size:18px;
+border:none;
+border-radius:8px;
+background:#219ebc;
+color:white;
+cursor:pointer;
+transition:0.2s;
+}
+
+#restartBtn:hover{
+background:#126782;
+transform:scale(1.05);
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+
+<div id="message"></div>
+
+<div id="score">Score : 0</div>
+
+<div id="hearts">❤️❤️❤️</div>
+
+</div>
+
+<canvas id="gameCanvas" width="900" height="320"></canvas>
+
+<div id="gameOverScreen">
+
+<div id="gameOverBox">
+
+<div id="gameOverTitle">
+🐻‍❄️ L'ours polaire s'est éteint...
+</div>
+
+<button id="restartBtn" onclick="restartGame()">Rejouer</button>
+
+</div>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("gameCanvas")
+const ctx=canvas.getContext("2d")
+
+const bearImg=new Image()
+bearImg.src="bear.png"
+
+const hunterImg=new Image()
+hunterImg.src="hunter.png"
+
+const crevasseImg=new Image()
+crevasseImg.src="crevasse.png"
+
+const sealImg = new Image()
+sealImg.src = "seal.png"
+
+const backgroundImg = new Image()
+backgroundImg.src = "background.png"
+
+let bear={
+x:80,
+y:220,
+width:120,
+height:100,
+dy:0,
+gravity:1,
+jump:-17,
+grounded:true,
+
+hitbox:{
+offsetX:20,
+offsetY:15,
+width:45,
+height:40
+}
+}
+
+
+let obstacles=[]
+let speed=6
+let score=0
+let lives=3
+let running=true
+
+const messages=[
+"🧊 La banquise en 2026 n'a jamais été aussi réduite !",
+"🐻‍❄️ Il reste environ 25 000 ours polaires !",
+"🌍 Le réchauffement détruit leur habitat !",
+"⚠️ Certaines populations de la banquise pourraient disparaître d'ici 2050 !",
+"💙 Chaque degré compte",
+"🐻‍❄️ La population des ours polaires pourait se réduire de plus d'un tiers sur les 35 prochaines années"
+]
+
+let msgIndex=0
+
+function changeMessage(){
+document.getElementById("message").textContent=messages[msgIndex]
+msgIndex=(msgIndex+1)%messages.length
+}
+
+setInterval(changeMessage,4000)
+changeMessage()
+
+function drawBackground(){
+
+ctx.drawImage(
+backgroundImg,
+0,
+0,
+canvas.width,
+canvas.height
+)
+
+}
+
+function drawBear(){
+ctx.drawImage(bearImg,bear.x,bear.y,bear.width,bear.height)
+}
+
+function createObstacle(){
+
+let rand = Math.random()
+
+let type
+
+if(rand < 0.45){
+type="hunter"
+}
+else if(rand < 0.9){
+type="crevasse"
+}
+else{
+type="seal"
+}
+
+let obs = { x:canvas.width , type:type }
+
+if(type==="hunter"){
+
+obs.y=150
+obs.width=90
+obs.height=90
+
+obs.hitbox={
+offsetX:20,
+offsetY:15,
+width:50,
+height:65
+}
+
+}
+
+else if(type==="crevasse"){
+
+obs.y=200
+obs.width=140
+obs.height=50
+
+obs.hitbox={
+offsetX:15,
+offsetY:10,
+width:110,
+height:30
+}
+
+}
+
+else if(type==="seal"){
+
+obs.y=180
+obs.width=90
+obs.height=70
+
+obs.hitbox={
+offsetX:10,
+offsetY:10,
+width:50,
+height:30
+}
+
+}
+
+obstacles.push(obs)
+
+}
+
+function drawObstacles(){
+
+obstacles.forEach((obs,i)=>{
+
+obs.x-=speed
+
+if(obs.type==="hunter"){
+ctx.drawImage(hunterImg,obs.x,obs.y,obs.width,obs.height)
+}
+else if(obs.type==="crevasse"){
+ctx.drawImage(crevasseImg,obs.x,obs.y,obs.width,obs.height)
+}
+else if(obs.type==="seal"){
+ctx.drawImage(sealImg,obs.x,obs.y,obs.width,obs.height)
+}
+
+if(obs.x+obs.width<0){
+obstacles.splice(i,1)
+score++
+document.getElementById("score").textContent="Score : "+score
+
+if(score%6===0)speed+=0.5
+}
+
+if(collision(bear,obs)){
+
+if(obs.type==="seal"){
+
+obstacles.splice(i,1)
+
+if(lives < 3){
+lives++
+updateHearts()
+}
+
+}else{
+
+hit(i)
+
+}
+
+}
+
+})
+
+}
+
+function collision(a,b){
+
+let ax=a.x+a.hitbox.offsetX
+let ay=a.y+a.hitbox.offsetY
+let aw=a.hitbox.width
+let ah=a.hitbox.height
+
+let bx=b.x+b.hitbox.offsetX
+let by=b.y+b.hitbox.offsetY
+let bw=b.hitbox.width
+let bh=b.hitbox.height
+
+return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by
+
+}
+
+function hit(i){
+
+obstacles.splice(i,1)
+
+lives--
+
+updateHearts()
+
+if(lives<=0)gameOver()
+
+}
+
+function updateHearts(){
+
+let h=""
+
+for(let i=0;i<lives;i++){
+h+="❤️"
+}
+
+document.getElementById("hearts").textContent=h
+
+}
+
+function update(){
+
+if(!running)return
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+drawBackground()
+bear.dy+=bear.gravity
+bear.y+=bear.dy
+
+if(bear.y>150){
+bear.y=150
+bear.dy=0
+bear.grounded=true
+}
+
+drawBear()
+drawObstacles()
+
+requestAnimationFrame(update)
+
+}
+
+document.addEventListener("keydown",e=>{
+if(e.code==="Space" && bear.grounded){
+bear.dy=bear.jump
+bear.grounded=false
+}
+})
+
+setInterval(createObstacle,1500)
+
+function gameOver(){
+
+running=false
+
+document.getElementById("gameOverScreen").style.display="flex"
+
+}
+
+function restartGame(){
+
+obstacles=[]
+speed=6
+score=0
+lives=3
+running=true
+
+document.getElementById("score").textContent="Score : 0"
+updateHearts()
+
+document.getElementById("gameOverScreen").style.display="none"
+
+update()
+
+}
+
+update()
+
+</script>
+
+</body>
+</html>
